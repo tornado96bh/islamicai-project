@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Iterable
+import json
+import math
+
+from .canonicalizer import canonicalize_phrase, normalize_surface_text, search_form_text, tokenize_text
+
+@dataclass(slots=True)
+class DictionaryEntry:
+    word: str
+    frequency: int = 0
+    document_frequency: int = 0
+    first_seen: str | None = None
+    last_seen: str | None = None
+
+class DictionaryLearner:
+    def __init__(self, storage_path: str | Path | None = None):
+        default_path = Path(__file__).resolve().parents[2] / "storage" / "learning" / "dictionary.json"
+        self.storage_path = Path(storage_path) if storage_path else default_path
+        self.storage_path.parent.mkdir(parents=True, exist_ok=True)
+        self.entries: dict[str, DictionaryEntry] = {}
+        self._loaded = False
+        self.load()
+
+    def load(self) -> None:
+        if self._loaded:
+            return
+        self._loaded = True
+        if not self.storage_path.exists() or self.storage_path.stat().st_size == 0:
+            return
+        try:
+            payload = json.loads(self.storage_path.read_text(encoding="utf-8"))
+        except Exception:
+            return
+        for item in payload.get("entries", []):
+            try:
+                entry = DictionaryEntry(**item)
+                self.entries[entry.word] = entry
+            except Exception:
+                continue
+
+    def save(self) -> None:
+        payload = {
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "entries": [asdict(entry) for entry in self.entries.values()],
+        }
+        self.storage_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def learn_text(self, text: str | None) -> int:
+        return self.learn_tokens(tokenize_text(text))
+
+    def learn_tokens(self, tokens: Iterable[str]) -> int:
+        items = [search_form_text(token) for token in tokens if search_form_text(token)]
+        if not items:
+            return 0
+
+        ts = datetime.now(timezone.utc).isoformat()
+        seen: set[str] = set()
+        for token in items:
+            entry = self.entries.get(token)
+            if entry is None:
+                entry = DictionaryEntry(word=token, first_seen=ts)
+            entry.frequency += 1
+            entry.last_seen = ts
+            self.entries[token] = entry
+            seen.add(token)
+
+        for token in seen:
+            self.entries[token].document_frequency += 1
+
+        return len(items)
+
+    def suggest(self, query: str, limit: int = 10) -> list[dict]:
+        q = search_form_text(query)
+        if not q:
+            return []
+
+        scored: list[tuple[float, DictionaryEntry]] = []
+        for entry in self.entries.values():
+            candidate = search_form_text(entry.word)
+            if not candidate:
+                continue
+            ratio = SequenceMatcher(None, q, candidate).ratio()
+            freq_bonus = math.log1p(entry.frequency) / 10.0
+            doc_bonus = math.log1p(entry.document_frequency) / 20.0
+            score = ratio + freq_bonus + doc_bonus
+            if candidate == q:
+                score += 1.5
+            if score >= 0.25:
+                scored.append((score, entry))
+
+        scored.sort(key=lambda item: (item[0], item[1].frequency, item[1].word), reverse=True)
+        return [
+            {
+                "word": entry.word,
+                "score": round(score, 4),
+                "frequency": entry.frequency,
+                "document_frequency": entry.document_frequency,
+            }
+            for score, entry in scored[:limit]
+        ]
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+# Re-export for compatibility with existing code.
+__all__ = [
+    "DictionaryLearner",
+    "DictionaryEntry",
+    "normalize_surface_text",
+    "search_form_text",
+    "tokenize_text",
+    "canonicalize_phrase",
+]

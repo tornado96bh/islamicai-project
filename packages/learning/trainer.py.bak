@@ -1,0 +1,440 @@
+﻿from __future__ import annotations
+
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+import json
+import os
+import time
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload, selectinload
+
+from packages.database.models import Book, Edition, Page, PageElement, Volume
+from packages.database.session import SessionLocal
+
+from .context import ContextLearner
+from .dictionary import DictionaryLearner, normalize_surface_text, search_form_text, tokenize_text
+from .embeddings import EmbeddingBuilder
+from .entities import EntityLearner
+from .phrases import PhraseLearner
+
+
+def _display_name(obj: Any) -> str:
+    for attr in ("name", "full_name", "title", "label", "value"):
+        value = getattr(obj, attr, None)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return str(obj).strip()
+
+
+class LearningTrainer:
+    def __init__(self, db: Session | None = None, storage_dir: str | Path | None = None):
+        self.db = db or SessionLocal()
+        self._owns_db = db is None
+        default_storage = Path(__file__).resolve().parents[2] / "storage" / "learning"
+        self.storage_dir = Path(storage_dir) if storage_dir else default_storage
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
+
+        self.dictionary = DictionaryLearner(self.storage_dir / "dictionary.json")
+        self.phrases = PhraseLearner(self.storage_dir / "phrases.json")
+        self.context = ContextLearner(self.storage_dir / "context.json")
+        self.entities = EntityLearner(self.storage_dir / "entities.json")
+        self.embeddings = EmbeddingBuilder(dimension=256)
+
+    def _resolve_book(self, element: PageElement) -> Book | None:
+        page = getattr(element, "page", None)
+        if page is None:
+            return None
+        volume = getattr(page, "volume", None)
+        if volume is None:
+            return None
+        edition = getattr(volume, "edition", None)
+        if edition is None:
+            return None
+        return getattr(edition, "book", None)
+
+    def _learn_metadata_entities(self) -> int:
+        count = 0
+        books = self.db.scalars(
+            select(Book).options(
+                selectinload(Book.authors),
+                selectinload(Book.publishers),
+                selectinload(Book.researchers),
+                selectinload(Book.editions),
+            )
+        ).all()
+
+        for book in books:
+            if book.title:
+                self.entities.learn_label(book.title, kind="book", evidence="book.title", score_boost=1.5)
+                count += 1
+            if book.short_title and book.short_title != book.title:
+                self.entities.learn_label(book.short_title, kind="book", evidence=book.title or "book.short_title", score_boost=1.0)
+                count += 1
+            if book.original_title and book.original_title not in {book.title, book.short_title}:
+                self.entities.learn_label(book.original_title, kind="book", evidence=book.title or "book.original_title", score_boost=1.0)
+                count += 1
+
+            for author in getattr(book, "authors", []) or []:
+                label = _display_name(author)
+                if label:
+                    self.entities.learn_label(label, kind="person", evidence=book.title or "author", score_boost=1.25)
+                    count += 1
+            for researcher in getattr(book, "researchers", []) or []:
+                label = _display_name(researcher)
+                if label:
+                    self.entities.learn_label(label, kind="person", evidence=book.title or "researcher", score_boost=1.0)
+                    count += 1
+            for publisher in getattr(book, "publishers", []) or []:
+                label = _display_name(publisher)
+                if label:
+                    self.entities.learn_label(label, kind="organization", evidence=book.title or "publisher", score_boost=0.75)
+                    count += 1
+
+        return count
+
+    def _sync_qdrant(self, page_profiles: list[dict[str, Any]], reset: bool) -> dict[str, Any]:
+        url = os.getenv("QDRANT_URL") or f"http://localhost:{os.getenv('QDRANT_PORT', '6333')}"
+        collection = os.getenv("QDRANT_COLLECTION", "islamicai_pages")
+        timeout = float(os.getenv("QDRANT_TIMEOUT", "15"))
+        batch_size = max(1, int(os.getenv("QDRANT_BATCH_SIZE", "50")))
+        retries = max(1, int(os.getenv("QDRANT_RETRIES", "4")))
+
+        try:
+            from qdrant_client import QdrantClient
+            from qdrant_client.http import models as qmodels
+        except Exception as exc:
+            return {
+                "enabled": False,
+                "error": f"qdrant_client unavailable: {exc}",
+                "url": url,
+                "collection": collection,
+            }
+
+        try:
+            client = QdrantClient(url=url, timeout=timeout)
+            vector_params = qmodels.VectorParams(
+                size=self.embeddings.dimension,
+                distance=qmodels.Distance.COSINE,
+            )
+
+            if reset:
+                client.recreate_collection(
+                    collection_name=collection,
+                    vectors_config=vector_params,
+                )
+            else:
+                try:
+                    client.get_collection(collection_name=collection)
+                except Exception:
+                    client.recreate_collection(
+                        collection_name=collection,
+                        vectors_config=vector_params,
+                    )
+
+            points = []
+            for profile in page_profiles:
+                vector = profile.get("vector") or []
+                if not vector:
+                    continue
+
+                payload = {k: v for k, v in profile.items() if k != "vector"}
+                points.append(
+                    qmodels.PointStruct(
+                        id=str(profile["page_id"]),
+                        vector=vector,
+                        payload=payload,
+                    )
+                )
+
+            if not points:
+                return {
+                    "enabled": True,
+                    "collection": collection,
+                    "points": 0,
+                    "uploaded": 0,
+                    "batches": 0,
+                    "batch_size": batch_size,
+                    "timeout": timeout,
+                    "url": url,
+                    "errors": [],
+                }
+
+            total_batches = (len(points) + batch_size - 1) // batch_size
+            uploaded = 0
+            errors = []
+
+            for batch_index in range(0, len(points), batch_size):
+                batch_no = (batch_index // batch_size) + 1
+                batch = points[batch_index : batch_index + batch_size]
+                success = False
+
+                for attempt in range(1, retries + 1):
+                    try:
+                        client.upsert(
+                            collection_name=collection,
+                            points=batch,
+                            wait=True,
+                            timeout=timeout,
+                        )
+                        uploaded += len(batch)
+                        print(
+                            f"[Qdrant] batch {batch_no}/{total_batches} uploaded "
+                            f"({uploaded}/{len(points)})"
+                        )
+                        success = True
+                        break
+                    except Exception as exc:
+                        if attempt >= retries:
+                            errors.append(
+                                {
+                                    "batch": batch_no,
+                                    "size": len(batch),
+                                    "error": str(exc),
+                                }
+                            )
+                        else:
+                            time.sleep(min(2 ** attempt, 8))
+
+                if not success:
+                    continue
+
+            return {
+                "enabled": True,
+                "collection": collection,
+                "points": len(points),
+                "uploaded": uploaded,
+                "batches": total_batches,
+                "batch_size": batch_size,
+                "timeout": timeout,
+                "url": url,
+                "errors": errors,
+            }
+        except Exception as exc:
+            return {
+                "enabled": False,
+                "error": str(exc),
+                "url": url,
+                "collection": collection,
+            }
+
+    def _build_profiles(self, elements: list[PageElement], scope: str) -> dict[str, Any]:
+        total_elements = len(elements)
+        processed = 0
+        skipped_blank = 0
+        total_tokens = 0
+        total_phrases = 0
+        total_context = 0
+        total_entities = 0
+
+        page_vectors: dict[str, list[list[float]]] = defaultdict(list)
+        page_meta: dict[str, dict[str, Any]] = {}
+
+        for index, element in enumerate(elements, start=1):
+            raw_text = element.text or ""
+            normalized = normalize_surface_text(raw_text)
+            search_text = search_form_text(normalized)
+            tokens = tokenize_text(search_text)
+
+            if not tokens:
+                skipped_blank += 1
+                continue
+
+            processed += 1
+            total_tokens += len(tokens)
+
+            self.dictionary.learn_tokens(tokens)
+            total_phrases += self.phrases.learn_tokens(tokens)
+            total_context += self.context.learn_tokens(tokens)
+            total_entities += self.entities.learn_tokens(tokens, source=normalized[:180])
+
+            page = getattr(element, "page", None)
+            if page is not None:
+                volume = getattr(page, "volume", None)
+                edition = getattr(volume, "edition", None) if volume is not None else None
+                book = getattr(edition, "book", None) if edition is not None else None
+
+                if page.id is not None:
+                    page_id = str(page.id)
+                    page_meta[page_id] = {
+                        "page_id": page_id,
+                        "page_number": getattr(page, "page_number", None),
+                        "volume_id": str(getattr(page, "volume_id", "")),
+                        "volume_number": getattr(volume, "volume_number", None) if volume is not None else None,
+                        "edition_id": str(getattr(edition, "id", "")) if edition is not None else None,
+                        "edition_number": getattr(edition, "edition_number", None) if edition is not None else None,
+                        "book_id": str(getattr(book, "id", "")) if book is not None else None,
+                        "book_title": getattr(book, "title", None) if book is not None else None,
+                        "sample_text": normalized[:320].strip(),
+                        "token_count": len(tokens),
+                    }
+                    page_vectors[page_id].append(self.embeddings.vectorize_tokens(tokens).values)
+
+            if index % 1000 == 0:
+                print(f"[{scope}] {index}/{total_elements}")
+
+        metadata_entities = self._learn_metadata_entities()
+
+        self.dictionary.save()
+        self.phrases.save()
+        self.context.save()
+        self.entities.save()
+
+        page_profiles: list[dict[str, Any]] = []
+        for page_id, vectors in page_vectors.items():
+            meta = page_meta.get(page_id, {"page_id": page_id})
+            avg_vector = self.embeddings.average(vectors).values
+            meta["vector"] = avg_vector
+            page_profiles.append(meta)
+
+        book_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for profile in page_profiles:
+            if profile.get("book_id"):
+                book_groups[str(profile["book_id"])].append(profile)
+
+        book_profiles: list[dict[str, Any]] = []
+        for book_id, profiles in book_groups.items():
+            vectors = [p["vector"] for p in profiles if p.get("vector")]
+            if not vectors:
+                continue
+            book_profiles.append(
+                {
+                    "book_id": book_id,
+                    "book_title": profiles[0].get("book_title"),
+                    "vector": self.embeddings.average(vectors).values,
+                    "page_count": len(profiles),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
+        (self.storage_dir / "page_embeddings.json").write_text(
+            json.dumps(
+                {
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "dimension": self.embeddings.dimension,
+                    "pages": page_profiles,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        (self.storage_dir / "book_embeddings.json").write_text(
+            json.dumps(
+                {
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "dimension": self.embeddings.dimension,
+                    "books": book_profiles,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        summary = {
+            "scope": scope,
+            "elements_total": total_elements,
+            "elements_processed": processed,
+            "elements_skipped_blank": skipped_blank,
+            "tokens_total": total_tokens,
+            "phrases_learned": total_phrases,
+            "context_links_learned": total_context,
+            "entity_events_learned": total_entities,
+            "metadata_entity_events": metadata_entities,
+            "vocabulary_size": len(self.dictionary),
+            "phrase_vocabulary_size": len(self.phrases),
+            "entity_vocabulary_size": len(self.entities),
+            "page_profiles": len(page_profiles),
+            "book_profiles": len(book_profiles),
+            "embedding_dimension": self.embeddings.dimension,
+        }
+
+        qdrant_status = self._sync_qdrant(page_profiles, reset=(scope == "all"))
+        summary["qdrant"] = qdrant_status
+
+        (self.storage_dir / "training_summary.json").write_text(
+            json.dumps(
+                {
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "summary": summary,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        return summary
+
+    def train_all(self) -> dict[str, Any]:
+        stmt = (
+            select(PageElement)
+            .options(
+                joinedload(PageElement.page)
+                .joinedload(Page.volume)
+                .joinedload(Volume.edition)
+                .joinedload(Edition.book)
+            )
+            .order_by(PageElement.page_id, PageElement.element_order)
+        )
+        elements = list(self.db.scalars(stmt).all())
+        return self._build_profiles(elements, scope="all")
+
+    def train_book(self, book_id) -> dict[str, Any]:
+        stmt = (
+            select(PageElement)
+            .join(PageElement.page)
+            .join(Page.volume)
+            .join(Volume.edition)
+            .join(Edition.book)
+            .where(Book.id == book_id)
+            .options(
+                joinedload(PageElement.page)
+                .joinedload(Page.volume)
+                .joinedload(Volume.edition)
+                .joinedload(Edition.book)
+            )
+            .order_by(PageElement.page_id, PageElement.element_order)
+        )
+        elements = list(self.db.scalars(stmt).all())
+        return self._build_profiles(elements, scope=f"book:{book_id}")
+
+    def train_volume(self, volume_id) -> dict[str, Any]:
+        stmt = (
+            select(PageElement)
+            .join(PageElement.page)
+            .where(Page.volume_id == volume_id)
+            .options(
+                joinedload(PageElement.page)
+                .joinedload(Page.volume)
+                .joinedload(Volume.edition)
+                .joinedload(Edition.book)
+            )
+            .order_by(PageElement.page_id, PageElement.element_order)
+        )
+        elements = list(self.db.scalars(stmt).all())
+        return self._build_profiles(elements, scope=f"volume:{volume_id}")
+
+    def train_page(self, page_id) -> dict[str, Any]:
+        stmt = (
+            select(PageElement)
+            .where(PageElement.page_id == page_id)
+            .options(
+                joinedload(PageElement.page)
+                .joinedload(Page.volume)
+                .joinedload(Volume.edition)
+                .joinedload(Edition.book)
+            )
+            .order_by(PageElement.element_order)
+        )
+        elements = list(self.db.scalars(stmt).all())
+        return self._build_profiles(elements, scope=f"page:{page_id}")
+
+    def close(self) -> None:
+        if self._owns_db:
+            self.db.close()
+

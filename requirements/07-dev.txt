@@ -1,0 +1,9 @@
+pytest==9.1.1
+pytest-asyncio==1.4.0
+ruff==0.16.0
+black==26.5.1
+isort==8.0.1
+mypy==2.3.0
+# MISSING: pre-commit
+coverage==7.15.2
+pytest-cov==7.1.0

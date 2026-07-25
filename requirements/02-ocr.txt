@@ -1,0 +1,6 @@
+numpy==2.5.1
+pillow==12.3.0
+opencv-python==5.0.0.93
+pytesseract==0.3.13
+# MISSING: rapidocr-onnxruntime
+RapidFuzz==3.14.5
