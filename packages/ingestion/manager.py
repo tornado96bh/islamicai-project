@@ -48,18 +48,18 @@ class IngestionManager:
         result = self.service.import_pdf(pdf_path, volume)
         self.db.commit()
 
+        # ---------------------------------------------------------------
+        # التدريب لم يعد يعمل داخل مسار الاستيراد.
+        #
+        # السبب: train_book() كان يعيد بناء كل ملفات التعلّم ويرفع إلى
+        # Qdrant داخل الطلب المتزامن، وهو عمل ثقيل مكانه Worker Service
+        # حسب الماستر §4. وكان أيضاً يمحو متجهات الكتب الأخرى.
+        #
+        # للتدريب اليدوي بعد الاستيراد:
+        #     python scripts/train_learning.py
+        # ---------------------------------------------------------------
         learning_summary = None
         learning_error = None
-        trainer = LearningTrainer(self.db)
-        try:
-            learning_summary = trainer.train_book(book.id)
-        except Exception as exc:
-            learning_error = str(exc)
-        finally:
-            try:
-                trainer.close()
-            except Exception:
-                pass
 
         return {
             "book": book,

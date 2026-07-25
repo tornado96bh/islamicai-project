@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -308,30 +308,24 @@ class LearningTrainer:
                 }
             )
 
-        (self.storage_dir / "page_embeddings.json").write_text(
-            json.dumps(
-                {
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                    "dimension": self.embeddings.dimension,
-                    "pages": page_profiles,
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
+        # دمج لا استبدال: الكتابة الكاملة كانت تمحو متجهات كل الكتب
+        # السابقة عند استيراد كتاب جديد (scope=book:<id>).
+        _merge_profile_index(
+            self.storage_dir / "page_embeddings.json",
+            key="pages",
+            id_field="page_id",
+            new_items=page_profiles,
+            dimension=self.embeddings.dimension,
+            replace_all=(scope == "all"),
         )
 
-        (self.storage_dir / "book_embeddings.json").write_text(
-            json.dumps(
-                {
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                    "dimension": self.embeddings.dimension,
-                    "books": book_profiles,
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
-            encoding="utf-8",
+        _merge_profile_index(
+            self.storage_dir / "book_embeddings.json",
+            key="books",
+            id_field="book_id",
+            new_items=book_profiles,
+            dimension=self.embeddings.dimension,
+            replace_all=(scope == "all"),
         )
 
         summary = {
@@ -437,4 +431,50 @@ class LearningTrainer:
         if self._owns_db:
             self.db.close()
 
+
+def _merge_profile_index(path, *, key, id_field, new_items, dimension, replace_all):
+    """
+    يدمج ملفات فهرس التعلّم بدل استبدالها.
+
+    قبل هذا الإصلاح كان كل استيراد لكتاب يكتب الملف كاملاً بمتجهات ذلك
+    الكتاب وحده، فتُفقد متجهات كل ما سبق. الدمج هنا يبقيها.
+
+    replace_all=True عند إعادة تدريب شاملة (scope="all") فقط.
+    """
+    import json as _json
+    from datetime import datetime as _dt, timezone as _tz
+    from pathlib import Path as _Path
+
+    path = _Path(path)
+    merged: dict[str, dict] = {}
+
+    if not replace_all and path.exists():
+        try:
+            old = _json.loads(path.read_text(encoding="utf-8"))
+            if old.get("dimension") == dimension:
+                for item in old.get(key, []) or []:
+                    ident = item.get(id_field)
+                    if ident:
+                        merged[str(ident)] = item
+        except Exception:
+            merged = {}
+
+    for item in new_items or []:
+        ident = item.get(id_field)
+        if ident:
+            merged[str(ident)] = item
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        _json.dumps(
+            {
+                "updated_at": _dt.now(_tz.utc).isoformat(),
+                "dimension": dimension,
+                key: list(merged.values()),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 

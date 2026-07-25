@@ -1,6 +1,73 @@
+# IslamicAI .gitignore
+# Rule: never commit a derived layer that can be rebuilt (master spec 5)
+
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# python
 __pycache__/
-.pytest_cache/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
 .venv/
-*.pyc
-*.pyo
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# derived layers - rebuilt from PostgreSQL
+storage/
 data/storage/
+data/cache/
+data/tmp/
+data/logs/
+*.faiss
+*.index
+
+# backups and junk
+*.bak
+*.fixbak
+*.before_*_fix
+*.orig
+*.rej
+*~
+_backup/
+
+# dumps and diagnostics
+project_tree.txt
+project_source_dump.txt
+architecture_dump.txt
+api_tree.txt
+packages_tree.txt
+error.txt
+
+# heavy files belong in MinIO or data/, not git
+*.zip
+*.tar.gz
+*.7z
+*.pdf
+*.djvu
+*.epub
+*.pt
+*.bin
+*.onnx
+*.safetensors
+
+# small test fixtures are allowed
+!tests/fixtures/**
+
+# os and editors
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

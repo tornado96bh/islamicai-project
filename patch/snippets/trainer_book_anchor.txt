@@ -1,0 +1,12 @@
+        (self.storage_dir / "book_embeddings.json").write_text(
+            json.dumps(
+                {
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "dimension": self.embeddings.dimension,
+                    "books": book_profiles,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )

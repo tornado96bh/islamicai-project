@@ -1,0 +1,10 @@
+        # دمج لا استبدال: الكتابة الكاملة كانت تمحو متجهات كل الكتب
+        # السابقة عند استيراد كتاب جديد (scope=book:<id>).
+        _merge_profile_index(
+            self.storage_dir / "page_embeddings.json",
+            key="pages",
+            id_field="page_id",
+            new_items=page_profiles,
+            dimension=self.embeddings.dimension,
+            replace_all=(scope == "all"),
+        )
