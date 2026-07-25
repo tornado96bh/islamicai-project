@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -8,6 +8,7 @@ import json
 import math
 
 from .dictionary import search_form_text, tokenize_text
+from .entity_filter import classify_entity
 
 TRIGGER_KIND = {
     "الإمام": "person",
@@ -175,17 +176,37 @@ class EntityLearner:
 
         ranked.sort(key=lambda item: (item[0], item[1].frequency, item[1].label), reverse=True)
 
-        return [
-            {
-                "label": item.label,
-                "kind": item.kind,
-                "score": round(score, 4),
-                "frequency": item.frequency,
-                "document_frequency": item.document_frequency,
-                "examples": item.examples,
-            }
-            for score, item in ranked[:limit]
-        ]
+        # ---------------------------------------------------------------
+        # فلترة بنيوية قبل الإخراج.
+        #
+        # التكرار وحده لا يميّز الكيان من العبارة الوظيفية: "من الباب"
+        # تكررت 6552 مرة لأنها صيغة إحالة في الهوامش، لا لأنها اسم.
+        # الفلتر يرفضها ويستبقي "أحمد بن محمد"، وينظّف "عن أحمد بن محمد"
+        # إلى "أحمد بن محمد".
+        # ---------------------------------------------------------------
+        out: list[dict] = []
+        for score, item in ranked:
+            if len(out) >= limit:
+                break
+
+            verdict = classify_entity(item.label)
+            if not verdict.accepted:
+                continue
+
+            out.append(
+                {
+                    "label": verdict.cleaned_label or item.label,
+                    "original_label": item.label,
+                    "kind": verdict.kind.value,
+                    "score": round(score, 4),
+                    "frequency": item.frequency,
+                    "document_frequency": item.document_frequency,
+                    "examples": item.examples,
+                    "filter_reason": verdict.reason,
+                }
+            )
+
+        return out
 
     def __len__(self) -> int:
         return len(self.entities)

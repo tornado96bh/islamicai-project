@@ -231,8 +231,22 @@ class LearningTrainer:
         page_vectors: dict[str, list[list[float]]] = defaultdict(list)
         page_meta: dict[str, dict[str, Any]] = {}
 
+        # أنواع لا تُعلَّم منها الكيانات: كل أمثلة "من الباب" و"في الحديث"
+        # كانت من الهوامش، فالتعلّم منها يعيد إنتاج الضجيج نفسه.
+        _REFERENCE_LAYOUTS = {
+            "footnote", "running_head", "page_number", "hadith_number",
+        }
+
         for index, element in enumerate(elements, start=1):
-            raw_text = element.text or ""
+            # مصدر التعلّم هو العمود المطبّع المصحَّح لا العمود القديم.
+            # element.text ما زال يحمل التمديد والرباطات المعطوبة، ولهذا
+            # بلغ تردد الحرف "د" وحده 16,359 مقابل "محمد" الصحيحة 2,651.
+            raw_text = (
+                getattr(element, "text_normalized", None)
+                or getattr(element, "text_raw", None)
+                or element.text
+                or ""
+            )
             normalized = normalize_surface_text(raw_text)
             search_text = search_form_text(normalized)
             tokens = tokenize_text(search_text)
@@ -241,13 +255,19 @@ class LearningTrainer:
                 skipped_blank += 1
                 continue
 
+            layout = (getattr(element, "element_type", "") or "").lower()
+            is_reference = layout in _REFERENCE_LAYOUTS
+
             processed += 1
             total_tokens += len(tokens)
 
             self.dictionary.learn_tokens(tokens)
             total_phrases += self.phrases.learn_tokens(tokens)
             total_context += self.context.learn_tokens(tokens)
-            total_entities += self.entities.learn_tokens(tokens, source=normalized[:180])
+            if not is_reference:
+                total_entities += self.entities.learn_tokens(
+                    tokens, source=normalized[:180]
+                )
 
             page = getattr(element, "page", None)
             if page is not None:

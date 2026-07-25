@@ -1,0 +1,75 @@
+{
+  "summary": {
+    "n_queries": 5,
+    "recall_at_k": null,
+    "mrr": null,
+    "p_at_1": null,
+    "must_contain_rate": 0.3,
+    "fragment_rate": 0.06,
+    "total_violations": 0,
+    "latency_ms_p50": 6099.3,
+    "latency_ms_max": 34494.6
+  },
+  "per_query": [
+    {
+      "id": "q001",
+      "query": "زرارة بن أعين",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 0.1,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "محمــــــد بــــــن أبي عمــــــير ، عــــــن عبــــــد االله بــــــن بكــــــي"
+    },
+    {
+      "id": "q002",
+      "query": "إنما الأعمال بالنيات",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 0.0,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "] ـ ١ [ ١٧ محمّـــــ د بـــــن يعقـــــوب ، عـــــن محمّـــــ د بـــــن يحـــــي"
+    },
+    {
+      "id": "q003",
+      "query": "اسماعيل",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 0.1,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "] ٣١ [ ٢٥ ـ وعنـــــه ، عـــــن أحمـــــد بـــــن محمّـــــ ، د عـــــن محمّــــ"
+    },
+    {
+      "id": "q004",
+      "query": "كتاب الطهارة",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 1.0,
+      "violations": 0,
+      "fragment_rate": 0.2,
+      "top1_text": "كتاب الطهارة"
+    },
+    {
+      "id": "q005",
+      "query": "الله",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.1,
+      "top1_text": ". االله"
+    }
+  ]
+}
