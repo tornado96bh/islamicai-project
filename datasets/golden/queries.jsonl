@@ -1,5 +1,12 @@
-{"id":"q001","query":"زرارة بن أعين","intent":"entity","note":"اسم راوٍ — يجب ألا يختلط بزر القميص","relevant_element_ids":[],"must_contain":["زراره"],"must_not_contain":[]}
-{"id":"q002","query":"إنما الأعمال بالنيات","intent":"hadith","note":"متن حديث — اختبار المطابقة الحرفية","relevant_element_ids":[],"must_contain":["الاعمال"],"must_not_contain":[]}
-{"id":"q003","query":"اسماعيل","intent":"entity","note":"بلا همزة — يجب أن يجد إسماعيل المهموزة","relevant_element_ids":[],"must_contain":["اسماعيل"],"must_not_contain":[]}
-{"id":"q004","query":"كتاب الطهارة","intent":"bibliography","note":"عنوان — يجب ألا تتصدر شظايا","relevant_element_ids":[],"must_contain":["الطهاره"],"must_not_contain":[]}
-{"id":"q005","query":"الله","intent":"general","note":"استعلام شديد الشيوع — اختبار انهيار الترتيب","relevant_element_ids":[],"must_contain":[],"must_not_contain":[]}
+{"id": "q001", "query": "زرارة بن أعين", "intent": "entity", "note": "اسم راوٍ — يجب ألا يختلط بزر القميص", "relevant_element_ids": [], "must_contain": ["زراره"], "must_not_contain": []}
+{"id": "q002", "query": "إنما الأعمال بالنيات", "intent": "hadith", "note": "متن حديث — اختبار المطابقة الحرفية", "relevant_element_ids": [], "must_contain": ["الاعمال"], "must_not_contain": []}
+{"id": "q003", "query": "اسماعيل", "intent": "entity", "note": "بلا همزة — يجب أن يجد إسماعيل المهموزة", "relevant_element_ids": [], "must_contain": ["اسماعيل"], "must_not_contain": []}
+{"id": "q004", "query": "كتاب الطهارة", "intent": "bibliography", "note": "عنوان — يجب ألا تتصدر شظايا", "relevant_element_ids": [], "must_contain": ["الطهاره"], "must_not_contain": []}
+{"id": "q005", "query": "الله", "intent": "general", "note": "استعلام شديد الشيوع — اختبار انهيار الترتيب", "relevant_element_ids": [], "must_contain": [], "must_not_contain": []}
+{"id": "q006", "query": "................................ ....................... ابن بابويه القمي", "intent": "entity", "relevant_element_ids": [], "must_contain": [], "must_not_contain": [], "note": "حُكم عليه يدوياً، 0 نتيجة صحيحة من 10"}
+{"id": "q007", "query": "......................... السيد ابن طاووس", "intent": "entity", "relevant_element_ids": [], "must_contain": [], "must_not_contain": [], "note": "حُكم عليه يدوياً، 0 نتيجة صحيحة من 10"}
+{"id": "q008", "query": "الشيخ علي التقيه لموافقتهما للعام", "intent": "entity", "relevant_element_ids": [], "must_contain": [], "must_not_contain": [], "note": "حُكم عليه يدوياً، 0 نتيجة صحيحة من 10"}
+{"id": "q009", "query": "الشيخ المساله الاخيره باسناده عن", "intent": "entity", "relevant_element_ids": [], "must_contain": [], "must_not_contain": [], "note": "حُكم عليه يدوياً، 0 نتيجة صحيحة من 10"}
+{"id": "q010", "query": "البيت عليهم السلام لاحيا التراث", "intent": "entity", "relevant_element_ids": [], "must_contain": [], "must_not_contain": [], "note": "حُكم عليه يدوياً، 0 نتيجة صحيحة من 10"}
+{"id": "q011", "query": "الله عليه واله الهادين المهتدين", "intent": "entity", "relevant_element_ids": [], "must_contain": [], "must_not_contain": [], "note": "حُكم عليه يدوياً، 0 نتيجة صحيحة من 10"}
+{"id": "q012", "query": "المراه عليها السوار والدملج )1(", "intent": "entity", "relevant_element_ids": [], "must_contain": [], "must_not_contain": [], "note": "حُكم عليه يدوياً، 0 نتيجة صحيحة من 10"}

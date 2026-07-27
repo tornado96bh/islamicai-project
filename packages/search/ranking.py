@@ -32,6 +32,8 @@ from collections import Counter
 from packages.learning.dictionary import search_form_text, tokenize_text
 
 from .fusion import DEFAULT_K, DEFAULT_SOURCE_WEIGHTS
+from .signals import DEFAULT_WEIGHTS as SIGNAL_WEIGHTS
+from .signals import compute_signals
 
 try:
     from packages.layout.classifier import layout_bonus
@@ -44,7 +46,7 @@ except ImportError:  # محرك التخطيط اختياري
         return 0.0
 from .models import hit_key
 
-RANKING_VERSION = "2.1.0"
+RANKING_VERSION = "2.3.0"
 
 # عنصر بأقل من هذا العدد من الكلمات يُعدّ شظية ويُخفَّض
 FRAGMENT_MIN_WORDS = 3
@@ -57,6 +59,26 @@ class RankingEngine:
         self.version = RANKING_VERSION
 
     # -- الإشارات الدلالية ------------------------------------------------
+
+    def _graded_signals(self, search_query, bucket: dict) -> tuple[float, dict]:
+        """
+        إشارات متدرّجة تُحسب من النتيجة نفسها.
+
+        الإشارات القديمة كانت ثنائية، فصارت في استعلام شائع مثل «الله»
+        إزاحةً ثابتة (0.022 في كل النتائج العشرين) لا إشارةَ تمييز.
+        هذه تتراوح بحسب جودة OCR وتغطية الاستعلام واكتمال الجملة.
+        """
+        query_tokens = list(
+            search_query.search_tokens
+            or tokenize_text(search_form_text(search_query.original or ""))
+        )
+        raw = bucket.get("best_text") or bucket.get("text") or ""
+        norm = bucket.get("search_text") or search_form_text(raw)
+
+        scores = compute_signals(
+            raw_text=raw, normalized_text=norm, query_tokens=query_tokens
+        )
+        return scores.weighted(SIGNAL_WEIGHTS), scores.as_dict()
 
     def _signal_bonus(self, search_query, intent, bucket: dict) -> float:
         """
@@ -207,6 +229,8 @@ class RankingEngine:
             explain = {"rrf_base": round(base, 6)}
 
             signal = self._signal_bonus(search_query, intent, bucket)
+            graded, graded_detail = self._graded_signals(search_query, bucket)
+            explain.update(graded_detail)
             exact = self._exact_raw_bonus(search_query, bucket)
 
             # ترجيح المتن على الهامش والترويسة الجارية.
@@ -215,10 +239,13 @@ class RankingEngine:
             layout = layout_bonus(bucket.get("best_element_type")
                                   or bucket.get("element_type"))
 
-            penalty = self._fragment_penalty(bucket, base + signal + exact + layout)
+            penalty = self._fragment_penalty(
+                bucket, base + signal + graded + exact + layout
+            )
 
-            total = base + signal + exact + layout + penalty
+            total = base + signal + graded + exact + layout + penalty
             explain["signals"] = round(signal, 6)
+            explain["graded_signals"] = round(graded, 6)
             explain["exact_raw"] = round(exact, 6)
             explain["layout"] = round(layout, 6)
             explain["fragment_penalty"] = round(penalty, 6)
@@ -243,4 +270,29 @@ class RankingEngine:
             reverse=True,
         )
 
+        ranked = self._diversify(ranked)
         return {"count": len(ranked), "results": ranked}
+
+    def _diversify(self, ranked: list[dict], max_per_page: int = 3) -> list[dict]:
+        """
+        يمنع صفحة واحدة من احتكار الصدارة.
+
+        في مخرجاتك ظهرت الصفحة 41 مرتين والصفحة 240 مرتين ضمن العشرين
+        الأولى. النتائج المتجاورة على صفحة واحدة تتشابه، فتزاحم تغطيةَ
+        بقية الكتاب. المتجاوزة لا تُحذف بل تُؤخَّر.
+        """
+        seen: dict[str, int] = {}
+        primary: list[dict] = []
+        deferred: list[dict] = []
+
+        for item in ranked:
+            key = str(item.get("page_id") or "")
+            count = seen.get(key, 0)
+            if count < max_per_page:
+                seen[key] = count + 1
+                primary.append(item)
+            else:
+                item["deferred_reason"] = "page_diversity"
+                deferred.append(item)
+
+        return primary + deferred

@@ -1,8 +1,0 @@
-        _merge_profile_index(
-            self.storage_dir / "book_embeddings.json",
-            key="books",
-            id_field="book_id",
-            new_items=book_profiles,
-            dimension=self.embeddings.dimension,
-            replace_all=(scope == "all"),
-        )

@@ -231,6 +231,12 @@ class LearningTrainer:
         page_vectors: dict[str, list[list[float]]] = defaultdict(list)
         page_meta: dict[str, dict[str, Any]] = {}
 
+        # رمز لا يحمل حروفاً عربية أو لاتينية = ترقيم خالص
+        def _is_punctuation_token(token: str) -> bool:
+            return not any(
+                ("\u0621" <= ch <= "\u064a") or ch.isalnum() for ch in token
+            )
+
         # أنواع لا تُعلَّم منها الكيانات: كل أمثلة "من الباب" و"في الحديث"
         # كانت من الهوامش، فالتعلّم منها يعيد إنتاج الضجيج نفسه.
         _REFERENCE_LAYOUTS = {
@@ -261,9 +267,18 @@ class LearningTrainer:
             processed += 1
             total_tokens += len(tokens)
 
-            self.dictionary.learn_tokens(tokens)
-            total_phrases += self.phrases.learn_tokens(tokens)
-            total_context += self.context.learn_tokens(tokens)
+            # رموز الترقيم المفردة لا تُتعلَّم: وجودها في العبارات
+            # أنتج اقتراحات مثل "الله )" و "الله ) عليه السلام (".
+            content_tokens = [
+                t for t in tokens if not _is_punctuation_token(t)
+            ]
+            if not content_tokens:
+                skipped_blank += 1
+                continue
+
+            self.dictionary.learn_tokens(content_tokens)
+            total_phrases += self.phrases.learn_tokens(content_tokens)
+            total_context += self.context.learn_tokens(content_tokens)
             if not is_reference:
                 total_entities += self.entities.learn_tokens(
                     tokens, source=normalized[:180]

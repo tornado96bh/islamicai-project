@@ -1,5 +1,0 @@
-{"id":"q001","query":"زرارة بن أعين","intent":"entity","note":"اسم راوٍ — يجب ألا يختلط بزر القميص","relevant_element_ids":[],"must_contain":["زراره"],"must_not_contain":[]}
-{"id":"q002","query":"إنما الأعمال بالنيات","intent":"hadith","note":"متن حديث — اختبار المطابقة الحرفية","relevant_element_ids":[],"must_contain":["الاعمال"],"must_not_contain":[]}
-{"id":"q003","query":"اسماعيل","intent":"entity","note":"بلا همزة — يجب أن يجد إسماعيل المهموزة","relevant_element_ids":[],"must_contain":["اسماعيل"],"must_not_contain":[]}
-{"id":"q004","query":"كتاب الطهارة","intent":"bibliography","note":"عنوان — يجب ألا تتصدر شظايا","relevant_element_ids":[],"must_contain":["الطهاره"],"must_not_contain":[]}
-{"id":"q005","query":"الله","intent":"general","note":"استعلام شديد الشيوع — اختبار انهيار الترتيب","relevant_element_ids":[],"must_contain":[],"must_not_contain":[]}

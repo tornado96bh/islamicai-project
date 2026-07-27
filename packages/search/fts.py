@@ -53,7 +53,9 @@ class FullTextSearcher:
     def __init__(self, db: Session):
         self.db = db
 
-    def search(self, query: str, limit: int = 20) -> list[dict]:
+    def search(
+        self, query: str, limit: int = 20, *, allow_or_fallback: bool = True
+    ) -> list[dict]:
         q = search_form_text(query)
         if not q:
             return []
@@ -81,7 +83,7 @@ class FullTextSearcher:
 
         # احتياطي OR: AND لم يجد شيئاً والاستعلام متعدد الكلمات
         words = [w for w in q.split() if w]
-        if not hits and len(words) > 1:
+        if allow_or_fallback and not hits and len(words) > 1:
             or_query = func.to_tsquery("simple", " | ".join(words))
             or_rank = func.ts_rank_cd(ts_vector, or_query).label("score")
             or_stmt = (
@@ -117,10 +119,20 @@ class FullTextSearcher:
         return out
 
     def search_many(self, queries: list[str], limit: int = 20) -> list[dict]:
+        """
+        احتياطي OR يعمل للاستعلام الأصلي وحده.
+
+        تشغيله لكل استعلام مرشّح يضاعف رحلات قاعدة البيانات: ستة عشر
+        استعلاماً تصير اثنين وثلاثين، وقفز زمن الاستجابة من 992 إلى
+        2506 مللي في القياس. والغرض من الاحتياطي إنقاذ الاستعلام
+        الأصلي حين لا تجتمع كلماته، لا توسيع المرشّحات أصلاً.
+        """
         out: list[dict] = []
         seen: set[str] = set()
-        for query in queries:
-            for hit in self.search(query, limit=max(limit, 20)):
+        for index, query in enumerate(queries):
+            for hit in self.search(
+                query, limit=max(limit, 20), allow_or_fallback=(index == 0)
+            ):
                 key = hit_key(hit)
                 if key in seen:
                     continue

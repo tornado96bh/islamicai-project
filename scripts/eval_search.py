@@ -172,6 +172,61 @@ def print_report(report: dict) -> None:
     print()
 
 
+LAST_RUN_PATH = REPO_ROOT / "_eval" / "last_run.json"
+
+
+def save_last_run(report: dict) -> None:
+    """
+    يحفظ نتيجة كل تشغيل تلقائياً.
+
+    سبب الإضافة: المقارنة بالأساس الثابت وحده أخفت انحداراً حقيقياً —
+    قفز الزمن من 992 إلى 2506 مللي بينما قال التقرير "لا انحدار" لأن
+    الأساس الأصلي كان 6099. الانحدار التدريجي لا يُرى إلا بمقارنة
+    التشغيل بسابقه.
+    """
+    LAST_RUN_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LAST_RUN_PATH.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def compare_with_last_run(current: dict) -> None:
+    """يقارن بالتشغيل السابق لكشف الانحدار التدريجي."""
+    if not LAST_RUN_PATH.exists():
+        return
+    try:
+        prev = json.loads(LAST_RUN_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    cs, ps = current["summary"], prev.get("summary", {})
+    print("\n" + "=" * 62)
+    print("  المقارنة مع التشغيل السابق  (كشف الانحدار التدريجي)")
+    print("=" * 62)
+
+    higher_better = ["recall_at_k", "mrr", "p_at_1", "must_contain_rate"]
+    lower_better = ["fragment_rate", "total_violations", "latency_ms_p50"]
+    regressed = False
+
+    for key in higher_better + lower_better:
+        a, b = ps.get(key), cs.get(key)
+        if a is None or b is None:
+            continue
+        diff = round(b - a, 4)
+        if diff == 0:
+            continue
+        good = (diff > 0) if key in higher_better else (diff < 0)
+        if not good:
+            regressed = True
+        mark = "تحسّن" if good else "انحدار"
+        print(f"  {key:28} {a:>10} -> {b:>10}  {diff:+}  {mark}")
+
+    if regressed:
+        print("\n  انحدار مقارنةً بالتشغيل السابق، حتى لو بدا الأساس أفضل.")
+    else:
+        print("\n  لا انحدار مقارنةً بالتشغيل السابق.")
+
+
 def compare(current: dict, baseline_path: Path) -> int:
     base = json.loads(baseline_path.read_text(encoding="utf-8"))
     cs, bs = current["summary"], base["summary"]
@@ -223,6 +278,8 @@ def main() -> int:
         return 2
 
     print_report(report)
+    compare_with_last_run(report)
+    save_last_run(report)
 
     if args.save:
         Path(args.save).write_text(

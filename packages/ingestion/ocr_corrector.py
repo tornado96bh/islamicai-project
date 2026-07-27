@@ -29,7 +29,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-OCR_CORRECTOR_VERSION = "1.0.0"
+OCR_CORRECTOR_VERSION = "1.1.0"
 
 # ---------------------------------------------------------------------------
 # 1) التمديد
@@ -177,6 +177,14 @@ def fix_ligatures(text: str) -> tuple[str, int]:
 _ARABIC_ONLY_RE = re.compile(r"^[\u0621-\u064a\u064b-\u065f\u0670\u0671]+$")
 
 
+# علامة ترقيم مفردة تقع بين شظيتي كلمة واحدة
+_LONE_PUNCT = {"،", ",", ".", ":", ";", "؛", "-", "ـ"}
+
+
+def _is_lone_punctuation(token: str) -> bool:
+    return token in _LONE_PUNCT
+
+
 def _is_pure_arabic(token: str) -> bool:
     """يمنع لحم الأرقام وعلامات الترقيم (مثل تحويل "1 من" إلى "1من")."""
     return bool(token) and bool(_ARABIC_ONLY_RE.match(token))
@@ -216,10 +224,53 @@ def merge_split_words(
     merged = 0
     i = 0
 
+    def _try_join(a: str, b: str, *, relaxed: bool = False) -> str | None:
+        """
+        يرجّع الكلمة الملحومة إن تحققت الشروط، وإلا None.
+
+        relaxed=True يُستعمل فقط حين تفصل الشظيتين علامةُ ترقيم مفردة.
+        وجود فاصلة بين جزأين يكوّن اجتماعُهما كلمةً معروفة دليلٌ قوي
+        بذاته على أن العطب شقّ الكلمة: الفاصلة الحقيقية بين كلمتين لا
+        ينتج عن حذفها كلمة صحيحة عادةً. وبدون هذا التخفيف تفشل حالات
+        مثل "حمّ ، اد" لأن "حم" نفسها صارت "كلمة" في المعجم الملوَّث.
+        """
+        if not (_is_pure_arabic(a) and _is_pure_arabic(b)):
+            return None
+        ka, kb = lexicon._key(a), lexicon._key(b)
+        short = ka if len(ka) <= len(kb) else kb
+        if len(short) > _SHORT_FRAGMENT_MAX or short in PROTECTED_SHORT_WORDS:
+            return None
+        # الكلمات المحمية على أي من الجانبين تمنع اللحم دائماً
+        if ka in PROTECTED_SHORT_WORDS or kb in PROTECTED_SHORT_WORDS:
+            return None
+        cand = a + b
+        if len(lexicon._key(cand)) < 3 or not lexicon.is_word(cand):
+            return None
+        if relaxed or len(short) == 1 or not lexicon.is_word(short):
+            return cand
+        return None
+
     while i < len(tokens):
         cur = tokens[i]
         nxt = tokens[i + 1] if i + 1 < len(tokens) else None
         did_merge = False
+
+        # حالة العطب الأشيع في هذا المتن: علامة ترقيم *داخل* الكلمة
+        #     "محمّ ، د"  ->  "محمّد"
+        #     "حمّ ، اد"   ->  "حمّاد"
+        # الفاصلة تفصل الشظيتين فلا تراهما دالة الجوار العادية. هذا هو
+        # سبب بقاء أسماء الرواة مقطّعة رغم عمل التصحيح على غيرها.
+        if nxt is not None and i + 2 < len(tokens) and _is_lone_punctuation(nxt):
+            joined = _try_join(cur, tokens[i + 2], relaxed=True)
+            if joined is not None:
+                out.append(joined)
+                merged += 1
+                if stats is not None and len(stats.merged_examples) < 30:
+                    stats.merged_examples.append(
+                        (f"{cur} {nxt} {tokens[i + 2]}", joined)
+                    )
+                i += 3
+                continue
 
         if cur and nxt and _is_pure_arabic(cur) and _is_pure_arabic(nxt):
             cur_key = lexicon._key(cur)

@@ -20,8 +20,16 @@ def build_element_hit(element: Any, score: float, source: str, reason: str = "")
     edition = getattr(volume, "edition", None) if volume is not None else None
     book = getattr(edition, "book", None) if edition is not None else None
 
-    raw_text = getattr(element, "text", "") or ""
+    # text_raw مقدّس: هو ما يُعرض ويُستشهد به، بكل حركاته وهمزاته.
+    raw_text = (
+        getattr(element, "text_raw", None) or getattr(element, "text", "") or ""
+    )
     snippet = clip_text(raw_text)
+
+    # النص المفهرَس المصحَّح. حسابه من الخام هنا كان يعيد إظهار عطب
+    # OCR في الواجهة رغم أن الفهرس نظيف — لأن التصحيح يجري في الملء
+    # لا في التطبيع اللحظي.
+    indexed_text = getattr(element, "text_normalized", None)
 
     return {
         "source": source,
@@ -40,7 +48,14 @@ def build_element_hit(element: Any, score: float, source: str, reason: str = "")
         "element_order": getattr(element, "element_order", None),
         "text": raw_text,
         "snippet": snippet,
-        "search_text": search_form_text(raw_text),
+        "search_text": indexed_text if indexed_text else search_form_text(raw_text),
+        # الصيغة المقروءة: بلا تمديد ولا تفكّك، بكل الحركات والهمزات
+        # والنقاط. هذا ما يُعرض للقارئ؛ و text يبقى الأصل للاستشهاد.
+        "text_display": getattr(element, "text_display", None) or raw_text,
+        "hadith_number": getattr(element, "hadith_number", None),
+        "isnad_text": getattr(element, "isnad_text", None),
+        "matn_text": getattr(element, "matn_text", None),
+        "split_confidence": getattr(element, "split_confidence", None),
         "sources": [source],
         "reasons": [reason] if reason else [],
         "best_element_id": str(getattr(element, "id", "")),

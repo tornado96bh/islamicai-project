@@ -1,0 +1,13 @@
+        normalized = self._join(search_form_text(token) for token in tokenize_text(label))
+        if not normalized:
+            return
+
+        # الترشيح عند التخزين لا عند العرض فقط.
+        # بدونه امتلأ entities.json بشظايا مثل
+        #   "................ ابن بابويه القمي"
+        #   "البيت عليهم السلام لاحيا التراث"
+        # ثم بنت أداةُ المجموعة الذهبية أسئلتها منه فخرجت فاسدة.
+        if not _is_storable_entity(normalized):
+            return
+
+        candidate = self.entities.get(normalized)

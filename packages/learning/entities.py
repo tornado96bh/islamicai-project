@@ -10,6 +10,29 @@ import math
 from .dictionary import search_form_text, tokenize_text
 from .entity_filter import classify_entity
 
+
+def _is_storable_entity(label: str) -> bool:
+    """
+    هل يستحق هذا المرشّح أن يُخزَّن أصلاً؟
+
+    كان الفلتر يُطبَّق عند العرض فقط، فامتلأ entities.json بشظايا
+    مثل "................ ابن بابويه القمي" و "البيت عليهم السلام
+    لاحيا التراث". ثم بنت أداةُ المجموعة الذهبية أسئلتَها منه فخرجت
+    أسئلة فاسدة.
+
+    الترشيح عند التخزين يمنع التلوّث من مصدره.
+    """
+    text = (label or "").strip()
+    if not text or len(text) > 60:
+        return False
+    # نقاط الفهارس والأرقام لا تدخل الكيانات
+    if "...." in text or ".. ." in text:
+        return False
+    digits = sum(1 for ch in text if ch.isdigit() or "\u0660" <= ch <= "\u0669")
+    if digits > 2:
+        return False
+    return classify_entity(text).accepted
+
 TRIGGER_KIND = {
     "الإمام": "person",
     "الامام": "person",
@@ -85,6 +108,14 @@ class EntityLearner:
     def learn_label(self, label: str | None, kind: str = "entity", evidence: str | None = None, score_boost: float = 0.0) -> None:
         normalized = self._join(search_form_text(token) for token in tokenize_text(label))
         if not normalized:
+            return
+
+        # الترشيح عند التخزين لا عند العرض فقط.
+        # بدونه امتلأ entities.json بشظايا مثل
+        #   "................ ابن بابويه القمي"
+        #   "البيت عليهم السلام لاحيا التراث"
+        # ثم بنت أداةُ المجموعة الذهبية أسئلتها منه فخرجت فاسدة.
+        if not _is_storable_entity(normalized):
             return
 
         candidate = self.entities.get(normalized)
