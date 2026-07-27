@@ -29,7 +29,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-OCR_CORRECTOR_VERSION = "1.3.0"
+OCR_CORRECTOR_VERSION = "1.2.0"
 
 # ---------------------------------------------------------------------------
 # 1) التمديد
@@ -306,15 +306,9 @@ def merge_split_words(
                 cand_key = lexicon._key(candidate)
 
                 if len(cand_key) >= 3 and lexicon.is_word(candidate):
-                    # حرف مفرد يقف كلمةً مستقلة ليس شظية.
-                    #
-                    # استثناء: "ا" + كلمة تبدأ بـ"ل" هي أداة التعريف
-                    # مشقوقةً ("ا لحسن" -> "الحسن")، لا ألفاً مستقلة.
+                    # حرف مفرد يقف كلمةً مستقلة ليس شظية
                     if len(short_key) == 1:
-                        definite_article = (
-                            cur_key == "\u0627" and nxt_key.startswith("\u0644")
-                        )
-                        ok = definite_article or short_key not in STANDALONE_LETTERS
+                        ok = short_key not in STANDALONE_LETTERS
                     else:
                         ok = not lexicon.is_word(short_key)
                     if ok:

@@ -1,0 +1,159 @@
+{
+  "summary": {
+    "n_queries": 12,
+    "recall_at_k": null,
+    "mrr": null,
+    "p_at_1": null,
+    "must_contain_rate": 0.925,
+    "fragment_rate": 0.0,
+    "total_violations": 0,
+    "latency_ms_p50": 2005.9,
+    "latency_ms_max": 2957.6
+  },
+  "per_query": [
+    {
+      "id": "q001",
+      "query": "زرارة بن أعين",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 0.7,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "محمــــــد بــــــن أبي عمــــــير ، عــــــن عبــــــد االله بــــــن بكــــــي"
+    },
+    {
+      "id": "q002",
+      "query": "إنما الأعمال بالنيات",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 1.0,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "] ـ قال ٧ [ ٩٨ : وروي أنّ ه قال إنمّ : ا الأعمال بالنيّ وإنمّ ، ات ا لا مرىء ما "
+    },
+    {
+      "id": "q003",
+      "query": "اسماعيل",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 1.0,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "] ٩٨٩ ـ ١ [ محمّــــ د بــــن يعقــــوب ، عــــن محمّــــ د بــــن إسماعيــــل ،"
+    },
+    {
+      "id": "q004",
+      "query": "كتاب الطهارة",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": 1.0,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "٨٩٢ كتاب الطهارة أبواب نواقض الوضوء"
+    },
+    {
+      "id": "q005",
+      "query": "الله",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "االله علـــــيهم ( قـــــال : قـــــال رســـــول االله ) صـــــلى االله عليـــــ"
+    },
+    {
+      "id": "q006",
+      "query": "................................ ....................... ابن بابويه القمي",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "ذلك بالشيخ الطوسي ، والصدوق ابن بابويه القُ . ميّ"
+    },
+    {
+      "id": "q007",
+      "query": "......................... السيد ابن طاووس",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": " ف تح الأبواب ................................ ......................... السيد "
+    },
+    {
+      "id": "q008",
+      "query": "الشيخ علي التقيه لموافقتهما للعام",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "أقـــــول : حملهمـــــا الشـــــيخ علـــــى التقيّـــــ ة لموافقتهمـــــا للعامّ"
+    },
+    {
+      "id": "q009",
+      "query": "الشيخ المساله الاخيره باسناده عن",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "وروى الشــــيخ الم ســــألة الأخـــــيرة بإســــناده عــــن محمّـــــ د بــــن ع"
+    },
+    {
+      "id": "q010",
+      "query": "البيت عليهم السلام لاحيا التراث",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "من أعمال مؤسسة آل البيت ـ عليهم السلام ـ لإحياء التراث"
+    },
+    {
+      "id": "q011",
+      "query": "الله عليه واله الهادين المهتدين",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "صلّ ى االله عليه وآله الهادين المهتدين صلاةً دائمةً إلى يوم الدين ."
+    },
+    {
+      "id": "q012",
+      "query": "المراه عليها السوار والدملج )1(",
+      "n_results": 20,
+      "recall_at_k": null,
+      "mrr": null,
+      "p_at_1": null,
+      "must_contain_rate": null,
+      "violations": 0,
+      "fragment_rate": 0.0,
+      "top1_text": "المــــــرأة عليهــــــا الســــــوار والــــــدملج )١( في بعــــــض ذراعهــــــ"
+    }
+  ]
+}

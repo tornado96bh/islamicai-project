@@ -32,7 +32,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-HADITH_SPLITTER_VERSION = "1.0.0"
+HADITH_SPLITTER_VERSION = "1.1.0"
 
 _D = r"0-9\u0660-\u0669"
 
@@ -125,7 +125,21 @@ class HadithSplitter:
         if not body.strip():
             return parts
 
-        # 2) نهاية السند
+        # 2) هل هذا نصّ رواية أصلاً؟
+        #
+        # التقسيم كان يُطبَّق على كل نص فأنتج عبثاً:
+        #     matn_text = ": قال"
+        #     matn_text = ": يؤمر برج ال إلى النار"
+        # وهي أجزاء جملة لا متونَ روايات. الشرط: إمّا سلسلة إسناد
+        # ظاهرة، وإمّا رقم رواية في المقدمة.
+        if not parts.number and not self._has_report_structure(body):
+            parts.matn = body.strip()
+            parts.matn_span = (body_start, len(raw))
+            parts.confidence = 0.3
+            parts.reasons.append("ليس نص رواية — لا تقسيم")
+            return parts
+
+        # 3) نهاية السند
         split_at, reason, conf = self._find_isnad_end(body)
 
         if split_at is None:
@@ -150,6 +164,14 @@ class HadithSplitter:
             parts.isnad_span = (body_start, len(raw))
             parts.confidence = 0.55
             parts.reasons.append("سند بلا متن بعد الفاصل")
+            return parts
+
+        # متن من كلمة أو كلمتين ليس متناً بل بقية جملة
+        if len(matn_text.split()) < 3:
+            parts.isnad = isnad_text
+            parts.isnad_span = (body_start, len(raw))
+            parts.confidence = 0.5
+            parts.reasons.append("ما بعد الفاصل أقصر من متن")
             return parts
 
         parts.isnad = isnad_text
@@ -202,6 +224,20 @@ class HadithSplitter:
                     return idx + len(opener), f"فاتحة متن: {opener.strip()}", 0.7
 
         return None, "لا فاصل واضح", 0.0
+
+    @staticmethod
+    def _has_report_structure(body: str) -> bool:
+        """
+        هل في النص بنية رواية؟
+
+        الشرط: سلسلة تحمّل (عن ... عن) مع نسب، أو فاتحة إسناد صريحة.
+        المتن المجرد أو جزء الجملة لا يُقسَّم.
+        """
+        if any(body.lstrip().startswith(o) for o in SANAD_OPENERS):
+            return True
+        transmissions = len(TRANSMISSION_RE.findall(body))
+        nasab = len(NASAB_RE.findall(body))
+        return transmissions >= 2 and nasab >= 1
 
     @staticmethod
     def _looks_like_isnad(body: str) -> bool:

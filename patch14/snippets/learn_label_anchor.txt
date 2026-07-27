@@ -1,5 +1,0 @@
-        normalized = self._join(search_form_text(token) for token in tokenize_text(label))
-        if not normalized:
-            return
-
-        candidate = self.entities.get(normalized)

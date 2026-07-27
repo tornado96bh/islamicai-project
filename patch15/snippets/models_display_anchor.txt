@@ -1,4 +1,0 @@
-        "element_order": getattr(element, "element_order", None),
-        "text": raw_text,
-        "snippet": snippet,
-        "search_text": indexed_text if indexed_text else search_form_text(raw_text),
