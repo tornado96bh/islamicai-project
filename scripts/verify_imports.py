@@ -119,6 +119,27 @@ def check_group(group, label: str, fatal: bool) -> tuple[int, int, list[str]]:
     return ok, failed, problems
 
 
+def check_app_starts() -> tuple[bool, list[str], str]:
+    """
+    يستورد تطبيق FastAPI ويستخرج مساراته.
+
+    الاستخراج بـ getattr لا بالوصول المباشر: قائمة app.routes تخلط
+    أنواعاً (Route و Mount و WebSocketRoute)، وبعضها بلا سمة `path`.
+    الاعتماد على تفصيل داخلي كهذا كسر الفحص سابقاً.
+    """
+    try:
+        from apps.api.app.main import app
+    except Exception as exc:
+        return False, [], f"{type(exc).__name__}: {exc}"
+
+    paths: set[str] = set()
+    for route in getattr(app, "routes", []):
+        path = getattr(route, "path", None) or getattr(route, "path_format", None)
+        if isinstance(path, str):
+            paths.add(path)
+    return True, sorted(paths), ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="فحص سلامة الاستيراد")
     ap.add_argument("--strict", action="store_true",
@@ -156,6 +177,22 @@ def main() -> int:
         print("  الأرجح أن الحزمة تحتاج: pip install -e .")
         for p in p2[:3]:
             print(f"    - {p[:100]}")
+        return 1 if args.strict else 0
+
+    print("\nإقلاع التطبيق")
+    print("-" * 62)
+    started, paths, error = check_app_starts()
+    if not started:
+        print(f"  [!] التطبيق لا يُستورَد: {error[:140]}")
+        print("      uvicorn سيفشل بنفس الخطأ.")
+        return 1
+
+    print(f"  [ok] التطبيق يُستورَد — {len(paths)} مساراً")
+    for path in paths:
+        print(f"       {path}")
+    if not any(p.startswith("/pipeline") for p in paths):
+        print("\n  [!] مسارات /pipeline غير مركّبة.")
+        print("      الأرجح أن الحزمة تحتاج: pip install -e .")
         return 1 if args.strict else 0
 
     print("\n  كل شيء سليم.")

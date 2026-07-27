@@ -29,7 +29,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-OCR_CORRECTOR_VERSION = "1.4.0"
+OCR_CORRECTOR_VERSION = "1.5.0"
 
 # ---------------------------------------------------------------------------
 # 1) التمديد
@@ -202,12 +202,50 @@ _DIACRITIC_SPLIT_RE = re.compile(
 )
 
 
+# حروف تفتتح كلمةً جديدة، فما بعد الحركة إن بدأ بها ليس شظية.
+#
+# العطب الذي يمنعه هذا الشرط: "مّ وأُ هاتنا" التحمت إلى "مّوأُ"
+# لأن النمط رأى حركةً ثم حرفين، ولم يسأل هل الحرفان بداية كلمة.
+# والواو هنا واو عطف، والهمزة فاء الكلمة.
+_WORD_INITIAL = frozenset("\u0648\u0641\u0628\u0644\u0643\u0623\u0625\u0622\u0621")
+
+# كلمات كاملة من حرفين لا تُلحم بما قبلها مهما كان
+_STANDALONE_TWO = frozenset({
+    "\u0645\u0646", "\u0641\u064a", "\u0639\u0646", "\u0645\u0627",
+    "\u0644\u0627", "\u0627\u0646", "\u0628\u0647", "\u0644\u0647",
+    "\u0647\u0648", "\u0647\u064a", "\u0642\u062f", "\u0628\u0646",
+    "\u0643\u0644", "\u0644\u0645", "\u0644\u0646", "\u064a\u0627",
+    "\u062b\u0645", "\u0645\u0639", "\u0627\u0648", "\u0627\u064a",
+})
+
+
+def _safe_diacritic_join(match: "re.Match[str]") -> str:
+    """
+    يقرّر هل هذا شقٌّ يُلحم أم كلمتان متجاورتان.
+
+    الشرط مزدوج: ألا يبدأ ما بعد الحركة بحرف يفتتح الكلمات، وألا
+    يكون كلمةً مستقلة من حرفين. بدونه يلتحم العطف والجار بما قبلهما.
+    """
+    head, tail = match.group(1), match.group(2)
+    bare = "".join(ch for ch in tail if "\u0621" <= ch <= "\u064a")
+
+    if bare in _STANDALONE_TWO:
+        return match.group(0)
+    if bare and bare[0] in _WORD_INITIAL and len(bare) >= 2:
+        return match.group(0)
+    return head + tail
+
+
 def fix_diacritic_splits(text: str) -> tuple[str, int]:
     """يلحم ما شقّه الفاصل بعد الحركة. يرجّع النص وعدد الإصلاحات."""
     if not text:
         return text, 0
-    out, n = _DIACRITIC_SPLIT_RE.subn(r"\1\2", text)
-    return out, n
+    out = _DIACRITIC_SPLIT_RE.sub(_safe_diacritic_join, text)
+    if out == text:
+        return text, 0
+    # العدّ بفرق الفراغات: أدقّ من عدّ المطابقات لأن بعضها يُرفض
+    n = len(text.split()) - len(out.split())
+    return out, max(n, 0)
 
 
 def _is_lone_punctuation(token: str) -> bool:

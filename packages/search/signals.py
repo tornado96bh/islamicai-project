@@ -53,7 +53,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-SIGNALS_VERSION = "1.2.0"
+SIGNALS_VERSION = "1.3.0"
 
 _TATWEEL = "\u0640"
 # يقبل الحركات: بدونها "محمّد" لا تُعدّ رمزاً عربياً أصلاً، فلا
@@ -217,12 +217,33 @@ def ocr_quality(raw_text: str) -> float:
     misread = len(re.findall(r"\u0627\u0627\u0644\u0644\u0647|\u0627\s\u0627\u0644\u0644\u0647", clean))
     misread_ratio = min(1.0, misread / max(len(tokens), 1) * 4)
 
+    # إشارتان إضافيتان تمنعان تشبّع المقياس عند 1.00.
+    #
+    # كان نصّان مختلفا الجودة ينالان 1.00 معاً، فيصير المقياس
+    # ثنائياً عملياً: سليم أو معطوب، بلا درجات بينهما. والترتيب
+    # والتحقق يُبنيان عليه، فيحتاجان تدرّجاً حقيقياً.
+
+    # (أ) كثافة الترقيم المنفصل: "، عن" و ") :" علامة نصّ مقطّع
+    lone_punct = sum(1 for t in tokens if t in _LONE_PUNCT)
+    punct_ratio = lone_punct / max(len(tokens), 1)
+
+    # (ب) اتساق طول الكلمات: التذبذب الشديد أثر تقطيع لا لغة
+    lengths = [_letter_count(t) for t in tokens if _ARABIC_RE.match(t)]
+    if len(lengths) >= 4:
+        mean = sum(lengths) / len(lengths)
+        variance = sum((x - mean) ** 2 for x in lengths) / len(lengths)
+        irregularity = min(1.0, variance / 12.0)
+    else:
+        irregularity = 0.0
+
     damage = min(
         1.0,
         tatweel_ratio * 0.7
         + fragment_ratio * 1.4
         + inner_ratio * 2.2
-        + misread_ratio * 1.2,
+        + misread_ratio * 1.2
+        + punct_ratio * 0.45
+        + irregularity * 0.25,
     )
     return round(max(0.0, 1.0 - damage), 4)
 

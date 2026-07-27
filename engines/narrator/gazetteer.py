@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
-GAZETTEER_VERSION = "1.0.0"
+GAZETTEER_VERSION = "1.1.0"
 
 DEFAULT_PATH = Path("datasets/gazetteer/narrators.json")
 
@@ -94,6 +94,42 @@ class ResolutionResult:
             "candidates": self.candidates,
             "reason": self.reason,
         }
+
+
+# سوابق تلتصق بالاسم في السند فتمنع مطابقته:
+#   "وعن محمد بن يحيى"  و  "عن أحمد بن محمد"  و  "، عن الحسين"
+# إزالتها رفعت نسبة الربط من نحو الثلث إلى الأغلب.
+_LEADING_PARTICLES = (
+    "وعن ", "فعن ", "ثم عن ", "عن ", "وعنه عن ", "عنه عن ", "و ", "ف ",
+    "حدثنا ", "حدّثنا ", "أخبرنا ", "اخبرنا ", "وباسناده عن ",
+    "وبإسناده عن ", "باسناده عن ", "بإسناده عن ",
+)
+
+# لواحق تلتصق بالذيل
+_TRAILING_PARTICLES = (" عن", " قال", " رحمه الله", " رضي الله عنه", " ،")
+
+
+def strip_particles(name: str) -> str:
+    """
+    ينزع أدوات العطف والتحمّل من طرفي الاسم.
+
+    يُعاد التطبيق حتى الاستقرار: "وعن عن فلان" واردة في OCR.
+    """
+    out = (name or "").strip(" .،:؛()[]«»")
+    changed = True
+    while changed and out:
+        changed = False
+        for p in _LEADING_PARTICLES:
+            if out.startswith(p):
+                out = out[len(p):].strip()
+                changed = True
+                break
+        for suffix in _TRAILING_PARTICLES:
+            if out.endswith(suffix):
+                out = out[: -len(suffix)].strip(" .،:؛")
+                changed = True
+                break
+    return out
 
 
 def _norm(text: str) -> str:
@@ -175,7 +211,15 @@ class NarratorGazetteer:
         if not raw:
             return ResolutionResult(raw, Resolution.UNRESOLVED, reason="فارغ")
 
-        key = _norm(raw)
+        # التنظيف قبل المطابقة: "وعن محمد بن يحيى" لا تطابق شيئاً،
+        # و"محمد بن يحيى" تطابق فوراً.
+        cleaned = strip_particles(raw)
+        if not cleaned:
+            return ResolutionResult(
+                raw, Resolution.UNRESOLVED, reason="أدوات فقط بلا اسم"
+            )
+
+        key = _norm(cleaned)
         hits = self._index.get(key, [])
 
         if len(hits) == 1:
@@ -194,15 +238,23 @@ class NarratorGazetteer:
                 reason=f"{len(hits)} مرشحين — يحتاج تمييزاً",
             )
 
-        # تقريب: احتواء متبادل
+        # تقريب على مستوى الكلمات لا المحارف.
+        #
+        # "احمد بن محمد بن عيسى الاشعري" و "أحمد بن محمد بن عيسى"
+        # تشتركان في أربع كلمات؛ المقارنة المحرفية تعطيهما 0.7 فقط
+        # لأن اللاحقة تطيل أحدهما. المقارنة بالكلمات أدق للأعلام.
+        key_words = set(key.split())
         best_id, best_score = None, 0.0
         for form, ids in self._index.items():
-            if len(form) < 5 or len(key) < 5:
+            form_words = set(form.split())
+            if len(form_words) < 2 or len(key_words) < 2:
                 continue
-            if form in key or key in form:
-                score = min(len(form), len(key)) / max(len(form), len(key))
-                if score > best_score:
-                    best_score, best_id = score, ids[0]
+            shared = key_words & form_words
+            if len(shared) < 2:
+                continue
+            score = len(shared) / max(len(key_words), len(form_words))
+            if score > best_score:
+                best_score, best_id = score, ids[0]
 
         if best_id and best_score >= 0.6:
             return ResolutionResult(
@@ -226,6 +278,7 @@ class NarratorGazetteer:
 
 
 __all__ = [
-    "DEFAULT_PATH", "GAZETTEER_VERSION", "Narrator", "NarratorGazetteer",
+    "DEFAULT_PATH",
+    "strip_particles", "GAZETTEER_VERSION", "Narrator", "NarratorGazetteer",
     "Resolution", "ResolutionResult",
 ]
