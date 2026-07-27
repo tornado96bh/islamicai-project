@@ -53,11 +53,46 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-SIGNALS_VERSION = "1.1.0"
+SIGNALS_VERSION = "1.2.0"
 
 _TATWEEL = "\u0640"
-_ARABIC_RE = re.compile(r"^[\u0621-\u064a]+$")
+# يقبل الحركات: بدونها "محمّد" لا تُعدّ رمزاً عربياً أصلاً، فلا
+# تُحسب ولا تُستثنى، وينحرف عدّ الشظايا.
+_ARABIC_RE = re.compile(r"^[\u0621-\u064a\u064b-\u0652\u0670]+$")
+
+# الطول يُقاس بالحروف لا بالمحارف: "محمّ" أربعة حروف لا خمسة
+_LETTERS_ONLY_RE = re.compile(r"[\u0621-\u064a]")
+
+
+def _letter_count(token: str) -> int:
+    return len(_LETTERS_ONLY_RE.findall(token))
+
+
+# كلمات عربية صحيحة من حرفين. عدّها شظايا هو ما جعل النص السليم
+# ينال درجةً متدنية: "عن أبيه ، عن سعد" فيها أربع "شظايا" مزعومة.
+_SHORT_REAL_WORDS = frozenset({
+    "عن", "من", "في", "ما", "لا", "ان", "إن", "أن", "به", "له", "هو",
+    "هي", "قد", "بن", "كل", "لم", "لن", "او", "أو", "يا", "ثم", "مع",
+    "هذ", "ذا", "بل", "عن", "اي", "أي", "اذ", "إذ", "كم", "لك", "بك",
+})
+
+
+def _is_fragment(token: str) -> bool:
+    """
+    شظية = رمز عربي قصير **ليس** كلمة قائمة بذاتها.
+
+    التمييز ضروري: بدونه يُعاقَب كل سند صحيح، لأن "عن" تتكرر فيه.
+    """
+    if not _ARABIC_RE.match(token):
+        return False
+    stripped = "".join(_LETTERS_ONLY_RE.findall(token))
+    return len(stripped) <= 2 and stripped not in _SHORT_REAL_WORDS
 _LONE_PUNCT = {"،", ",", ".", ":", ";", "؛", "-", "(", ")", "[", "]"}
+
+# نفس قاعدة المصحّح: الفاصل بعد الحركة عطب طباعي لا فاصل كلمات
+_DIACRITIC_SPLIT_RE = re.compile(
+    r"([\u0621-\u064a][\u064b-\u0652\u0670])\s+([\u0621-\u064a]{1,2})(?=\s|$|[^\u0621-\u064a])"
+)
 
 # نص يبدأ أو ينتهي بهذه لا يكون جملة تامة
 _OPENERS_INCOMPLETE = {"،", "و", "ف", ":", "(", ")"}
@@ -137,27 +172,58 @@ def ocr_quality(raw_text: str) -> float:
     length = len(raw_text)
     tatweel_ratio = raw_text.count(_TATWEEL) / length
 
-    tokens = raw_text.split()
+    # الشظايا تُحسب على النص **بعد** إزالة التمديد.
+    #
+    # وإلا فـ"بـــــن" تُعدّ رمزاً طويلاً و"محمّـــــد" كلمتين، فينال
+    # النص المقروء درجةً أسوأ من "االله" المعطوب فعلاً. هذا ما رأيتَه:
+    # sig_ocr_quality = 0 لنصوص سليمة.
+    clean = raw_text.replace(_TATWEEL, "")
+
+    # ثم يُصلَح الشقّ بعد الحركة قبل عدّ الشظايا.
+    #
+    # "محمّـــــ د" بعد إزالة التمديد تصير "محمّ د" — شظيةً في العدّ،
+    # مع أن المصحّح يلحمها إلى "محمّد" بلا خسارة. فقياس الجودة على
+    # نص لم يمر بالتصحيح يعاقب ما سيُصلَح فعلاً.
+    clean = _DIACRITIC_SPLIT_RE.sub(r"\1\2", clean)
+    tokens = clean.split()
     if not tokens:
         return 0.0
 
     # شظايا: رموز عربية من حرف أو حرفين
-    fragments = sum(
-        1 for t in tokens if _ARABIC_RE.match(t.replace(_TATWEEL, "")) and len(t.replace(_TATWEEL, "")) <= 2
-    )
+    fragments = sum(1 for t in tokens if _is_fragment(t))
     fragment_ratio = fragments / len(tokens)
 
     # ترقيم يقع بين شظيتين عربيتين: علامة تفكّك داخل الكلمة
     inner_punct = 0
     for i in range(1, len(tokens) - 1):
         if tokens[i] in _LONE_PUNCT:
-            a = tokens[i - 1].replace(_TATWEEL, "")
-            b = tokens[i + 1].replace(_TATWEEL, "")
-            if _ARABIC_RE.match(a) and _ARABIC_RE.match(b) and min(len(a), len(b)) <= 3:
+            a, b = tokens[i - 1], tokens[i + 1]
+            if (_is_fragment(a) or _is_fragment(b)) and _ARABIC_RE.match(
+                a
+            ) and _ARABIC_RE.match(b):
                 inner_punct += 1
     inner_ratio = inner_punct / max(len(tokens), 1)
 
-    damage = min(1.0, tatweel_ratio * 2.0 + fragment_ratio * 1.2 + inner_ratio * 2.0)
+    # التمديد الطباعي ليس فشلاً بصرياً.
+    #
+    # "محمّـــــد بـــــن يحـــــيى" مقروء تماماً؛ التمديد تنسيقُ صفحة
+    # يزيله المصحّح بلا خسارة. أما "االله" فخطأ قراءة يغيّر الحروف.
+    # إعطاؤهما الدرجة نفسها (صفر) جعل نصوصاً سليمة تُرفض من حزمة
+    # الأدلة، فانخفضت التغطية وصار المحقق يمتنع بلا سبب حقيقي.
+    #
+    # فوزن التمديد خُفّض إلى الثلث، ووزن التفكّك الحقيقي رُفع.
+    # "االله" و "ا الله": ألف زائدة قبل لفظ الجلالة — خطأ قراءة يغيّر
+    # الحروف نفسها، وهو أخطر من التمديد لأنه لا يُزال بحذف محرف.
+    misread = len(re.findall(r"\u0627\u0627\u0644\u0644\u0647|\u0627\s\u0627\u0644\u0644\u0647", clean))
+    misread_ratio = min(1.0, misread / max(len(tokens), 1) * 4)
+
+    damage = min(
+        1.0,
+        tatweel_ratio * 0.7
+        + fragment_ratio * 1.4
+        + inner_ratio * 2.2
+        + misread_ratio * 1.2,
+    )
     return round(max(0.0, 1.0 - damage), 4)
 
 

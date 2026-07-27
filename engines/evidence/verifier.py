@@ -31,7 +31,7 @@ from enum import Enum
 
 from .bundle import EvidenceBundle
 
-VERIFIER_VERSION = "1.0.0"
+VERIFIER_VERSION = "1.1.0"
 
 
 class Verdict(str, Enum):
@@ -193,13 +193,19 @@ class Verifier:
         ليقرر المحقق البشري.
         """
         found: list[str] = []
-        texts = [(i, re.sub(r"\s+", " ", i.matn_text or i.text_display or ""))
+        texts = [re.sub(r"\s+", " ", i.matn_text or i.text_display or "")
                  for i in bundle.citable]
+
         for a, b in _CONTRADICTION_PAIRS:
-            has_a = [t for _, t in texts if a in t and b not in t]
-            has_b = [t for _, t in texts if b in t]
-            if has_a and has_b:
+            # النص الذي يجمع الطرفين ليس متعارضاً بل مبيِّناً:
+            # "الماء يطهر ولا يطهر" جملة واحدة تفيد أنه مطهِّر لا
+            # متطهِّر. الاعتداد بها تعارضاً أرسل أحاديث سليمة إلى
+            # المراجعة بلا سبب.
+            with_a = [t for t in texts if a in t and b not in t]
+            with_b = [t for t in texts if b in t and a not in t.replace(b, "")]
+            if with_a and with_b:
                 found.append(f"تعارض ظاهر بين «{a}» و«{b}»")
+
         return found
 
 

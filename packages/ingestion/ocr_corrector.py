@@ -29,7 +29,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-OCR_CORRECTOR_VERSION = "1.3.0"
+OCR_CORRECTOR_VERSION = "1.4.0"
 
 # ---------------------------------------------------------------------------
 # 1) التمديد
@@ -189,6 +189,27 @@ STANDALONE_LETTERS = {
 }
 
 
+# المسافة بعد الشدّة أو أي حركة: عطب طباعي لا فاصل كلمات.
+#
+#     "محمّ د"   ->  "محمّد"
+#     "عدّ ة"    ->  "عدّة"
+#     "إنّ ه"    ->  "إنّه"
+#
+# العلّة أن مُخرج OCR يضع فاصلاً بعد الحركة، فتنكسر الكلمة. وهذه
+# الحالة قاطعة بذاتها: لا تبدأ كلمةٌ عربية بحرف واحد بعد شدّة.
+_DIACRITIC_SPLIT_RE = re.compile(
+    r"([\u0621-\u064a][\u064b-\u0652\u0670])\s+([\u0621-\u064a]{1,2})(?=\s|$|[^\u0621-\u064a])"
+)
+
+
+def fix_diacritic_splits(text: str) -> tuple[str, int]:
+    """يلحم ما شقّه الفاصل بعد الحركة. يرجّع النص وعدد الإصلاحات."""
+    if not text:
+        return text, 0
+    out, n = _DIACRITIC_SPLIT_RE.subn(r"\1\2", text)
+    return out, n
+
+
 def _is_lone_punctuation(token: str) -> bool:
     return token in _LONE_PUNCT
 
@@ -224,9 +245,13 @@ def merge_split_words(
     if not lexicon.loaded or not text:
         return text, 0
 
+    # الشقّ بعد الحركة يُصلَح أولاً: قاعدة قاطعة لا تحتاج معجماً،
+    # وتصحيحها يمكّن اللحم المعجمي بعدها من رؤية الكلمة كاملة.
+    text, diacritic_fixes = fix_diacritic_splits(text)
+
     tokens = text.split(" ")
     if len(tokens) < 2:
-        return text, 0
+        return text, diacritic_fixes
 
     out: list[str] = []
     merged = 0
@@ -329,7 +354,7 @@ def merge_split_words(
             out.append(cur)
             i += 1
 
-    return " ".join(out), merged
+    return " ".join(out), merged + diacritic_fixes
 
 
 class OcrCorrector:

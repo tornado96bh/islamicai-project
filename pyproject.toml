@@ -36,7 +36,7 @@ dependencies = [
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["apps*", "packages*"]
+include = ["apps*", "packages*", "engines*"]
 
 [tool.ruff]
 line-length = 100
