@@ -1,0 +1,7 @@
+def search_form_text(text: str | None) -> str:
+    text = normalize_surface_text(text)
+    if not text:
+        return ""
+    text = ARABIC_DIACRITICS_RE.sub("", text)
+    text = MULTISPACE_RE.sub(" ", text).strip()
+    return text

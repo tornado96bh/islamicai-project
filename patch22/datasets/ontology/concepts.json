@@ -1,0 +1,366 @@
+{
+  "schema_version": "1.0.0",
+  "count": 28,
+  "note": "شجرة مفاهيم بذرة. التوسيع بإضافة مدخلات هنا — لا تعديل في الكود.",
+  "concepts": [
+    {
+      "id": "c001",
+      "label": "فقه",
+      "parent": null,
+      "synonyms": [],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "جذر"
+    },
+    {
+      "id": "c010",
+      "label": "عبادات",
+      "parent": "c001",
+      "synonyms": [],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c100",
+      "label": "طهارة",
+      "parent": "c010",
+      "synonyms": [
+        "الطهارة",
+        "طهاره"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c110",
+      "label": "وضوء",
+      "parent": "c100",
+      "synonyms": [
+        "الوضوء",
+        "وضو"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [
+        "c113"
+      ],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c111",
+      "label": "نواقض الوضوء",
+      "parent": "c110",
+      "synonyms": [
+        "نواقض",
+        "ناقض"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c112",
+      "label": "مسح على الخفين",
+      "parent": "c110",
+      "synonyms": [
+        "المسح على الخفين",
+        "الخفين"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c113",
+      "label": "وضوء الجبيرة",
+      "parent": "c110",
+      "synonyms": [
+        "الجبيرة",
+        "جبيره"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c120",
+      "label": "غسل",
+      "parent": "c100",
+      "synonyms": [
+        "الغسل",
+        "اغتسال"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c121",
+      "label": "غسل الجنابة",
+      "parent": "c120",
+      "synonyms": [
+        "الجنابة",
+        "جنابه"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c130",
+      "label": "تيمم",
+      "parent": "c100",
+      "synonyms": [
+        "التيمم",
+        "تيمّم"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c140",
+      "label": "نجاسة",
+      "parent": "c100",
+      "synonyms": [
+        "النجاسة",
+        "نجس",
+        "نجاسات"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c141",
+      "label": "استنجاء",
+      "parent": "c140",
+      "synonyms": [
+        "الاستنجاء",
+        "استبراء"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c150",
+      "label": "ماء",
+      "parent": "c100",
+      "synonyms": [
+        "الماء",
+        "مياه"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c151",
+      "label": "ماء جارٍ",
+      "parent": "c150",
+      "synonyms": [
+        "الماء الجاري",
+        "جاري"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c152",
+      "label": "ماء كرّ",
+      "parent": "c150",
+      "synonyms": [
+        "الكر",
+        "كرّ",
+        "ماء الكر"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c153",
+      "label": "ماء قليل",
+      "parent": "c150",
+      "synonyms": [
+        "الماء القليل",
+        "قليل"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c154",
+      "label": "سؤر",
+      "parent": "c150",
+      "synonyms": [
+        "الاسآر",
+        "اسار",
+        "سور"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c200",
+      "label": "صلاة",
+      "parent": "c010",
+      "synonyms": [
+        "الصلاة",
+        "صلوة"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c210",
+      "label": "قبلة",
+      "parent": "c200",
+      "synonyms": [
+        "القبلة",
+        "قبله"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c220",
+      "label": "أوقات الصلاة",
+      "parent": "c200",
+      "synonyms": [
+        "الاوقات",
+        "وقت الصلاة"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c300",
+      "label": "صوم",
+      "parent": "c010",
+      "synonyms": [
+        "الصوم",
+        "صيام"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c400",
+      "label": "حج",
+      "parent": "c010",
+      "synonyms": [
+        "الحج",
+        "حجّ"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c500",
+      "label": "معاملات",
+      "parent": "c001",
+      "synonyms": [
+        "المعاملات"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c510",
+      "label": "بيع",
+      "parent": "c500",
+      "synonyms": [
+        "البيع",
+        "شراء"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c520",
+      "label": "مضاربة",
+      "parent": "c500",
+      "synonyms": [
+        "المضاربة",
+        "مضارب"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c600",
+      "label": "أحكام",
+      "parent": "c001",
+      "synonyms": [
+        "الاحكام"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c610",
+      "label": "حلال",
+      "parent": "c600",
+      "synonyms": [
+        "الحلال"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    },
+    {
+      "id": "c620",
+      "label": "حرام",
+      "parent": "c600",
+      "synonyms": [
+        "الحرام"
+      ],
+      "children": [],
+      "related": [],
+      "excludes": [],
+      "note": "بذرة — وسّعها بمراجعتك"
+    }
+  ]
+}

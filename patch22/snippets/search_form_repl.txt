@@ -1,0 +1,47 @@
+# الفاصل بعد الحركة عطبٌ طباعي لا فاصل كلمات.
+#
+# لماذا هنا تحديداً: نزع الحركات كان يسبق اللحم، فتتحول "محمّ د"
+# إلى "محم د" ويضيع الدليل الوحيد على أن الشقّ عطب. فتُفهرَس
+# كلمتين، ولا يجدها من يبحث عن "محمد".
+_DIACRITIC_SPLIT_RE = re.compile(
+    r"([\u0621-\u064a][\u064b-\u0652\u0670])\s+([\u0621-\u064a]{1,2})"
+    r"(?=\s|$|[^\u0621-\u064a])"
+)
+
+# حروف تفتتح كلمة، وكلمات تامة من حرفين: لا تُلحم بما قبلها
+_WORD_INITIAL = frozenset("\u0648\u0641\u0628\u0644\u0643\u0623\u0625\u0622\u0621")
+_STANDALONE_TWO = frozenset({
+    "\u0645\u0646", "\u0641\u064a", "\u0639\u0646", "\u0645\u0627",
+    "\u0644\u0627", "\u0627\u0646", "\u0628\u0647", "\u0644\u0647",
+    "\u0647\u0648", "\u0647\u064a", "\u0642\u062f", "\u0628\u0646",
+    "\u0643\u0644", "\u0644\u0645", "\u0644\u0646", "\u064a\u0627",
+    "\u062b\u0645", "\u0645\u0639", "\u0627\u0648", "\u0627\u064a",
+})
+
+
+def _join_diacritic_split(match: "re.Match[str]") -> str:
+    head, tail = match.group(1), match.group(2)
+    bare = "".join(ch for ch in tail if "\u0621" <= ch <= "\u064a")
+    if bare in _STANDALONE_TWO:
+        return match.group(0)
+    if bare and bare[0] in _WORD_INITIAL and len(bare) >= 2:
+        return match.group(0)
+    return head + tail
+
+
+def repair_diacritic_splits(text: str | None) -> str:
+    """يلحم ما شقّه الفاصل بعد الحركة، قبل نزع الحركات."""
+    if not text:
+        return ""
+    return _DIACRITIC_SPLIT_RE.sub(_join_diacritic_split, text)
+
+
+def search_form_text(text: str | None) -> str:
+    text = normalize_surface_text(text)
+    if not text:
+        return ""
+    # الترتيب حاسم: اللحم أولاً، لأنه يحتاج الحركة دليلاً
+    text = repair_diacritic_splits(text)
+    text = ARABIC_DIACRITICS_RE.sub("", text)
+    text = MULTISPACE_RE.sub(" ", text).strip()
+    return text
